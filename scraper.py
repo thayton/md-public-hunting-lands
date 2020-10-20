@@ -53,7 +53,7 @@ class MDPublicLandsScraper(object):
         h2 = h5.find_previous('h2')
 
         text_list = h5.find_all(text=True)
-        name = text_list[0].split(':')[0]
+        name = text_list[0].split(':')[0].strip()
         keys = ''.join(t.strip() for t in text_list[1:])
 
         e = self.xlat_key_codes(keys)
@@ -112,7 +112,7 @@ class MDPublicLandsScraper(object):
         listing = [ h2, h5 ]
         n = h5.next_sibling
         while True:
-            if n.name == 'h5' or n.name == 'h2':
+            if n == None or n.name in ['h5', 'h2']:
                 break
             listing.append(n)
             n = n.next_sibling
@@ -144,4 +144,5 @@ class MDPublicLandsScraper(object):
 
 if __name__ == '__main__':
     scraper = MDPublicLandsScraper()
-    scraper.scrape()
+    lands = scraper.scrape()
+    print(json.dumps(lands, indent=2))
