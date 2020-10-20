@@ -90,7 +90,7 @@ class MDPublicLandsScraper(object):
             e['county'] = h2.text.strip()
             
             if len(keys) > 1:
-                d = self.xlat_key_codes(keys)
+                d = self.xlat_key_codes(keys[-1].strip())
                 e.update(d)
 
             entries.append(e)
