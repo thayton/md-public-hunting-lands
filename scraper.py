@@ -102,6 +102,10 @@ class MDPublicLandsScraper(object):
                 d = self.xlat_key_codes(keys)
                 e.update(d)
 
+            m = re.search(RE_ACRES, li.text)
+            if m:
+                e['acres'] = m.group(1)
+                
             entries.append(e)
 
         return entries
