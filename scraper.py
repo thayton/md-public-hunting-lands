@@ -46,14 +46,15 @@ class MDPublicLandsScraper(object):
         d = { key_code[k]: True for k in keys if key_code.get(k) }
         return d
 
-    def get_land_info(self, h5):
+    def get_land_info(self, listing):
         global RE_ACRES, RE_ARCHERY_ONLY
-        
+
+        h5 = listing.h5
         h2 = h5.find_previous('h2')
 
-        text = h5.text.split(':')
-        name = text[0]
-        keys = text[1]
+        text_list = h5.find_all(text=True)
+        name = text_list[0].split(':')[0]
+        keys = ''.join(t.strip() for t in text_list[1:])
 
         e = self.xlat_key_codes(keys)
 
@@ -73,29 +74,53 @@ class MDPublicLandsScraper(object):
 
         return e
 
-    def process_sublist(self, h5):
+    def process_sublist(self, listing):
         entries = []
 
+        h5 = listing.h5        
         h2 = h5.find_previous('h2')        
         ul = h5.find_next('ul')
 
         for li in ul.find_all('li'):
-            text = li.text.split(':')
-            name = text[0]
-            desc = text[1]
-            keys = desc.split(';')
+            name = li.strong.text.split(':')[0].strip()
+            span = li.select_one('span.Public-Lands-Key-Letters')
+            
+            if span:
+                keys = span.text
+            else:
+                keys = li.text.split(';')
+                if len(keys) > 1:
+                    keys = keys[-1].strip()
+                else:
+                    keys = None
 
             e = {}
             e['name'] = name
             e['county'] = h2.text.strip()
-            
-            if len(keys) > 1:
-                d = self.xlat_key_codes(keys[-1].strip())
+
+            if keys:
+                d = self.xlat_key_codes(keys)
                 e.update(d)
 
             entries.append(e)
 
         return entries
+
+    def extract_listing(self, h5):
+        h2 = h5.find_previous('h2')
+
+        listing = [ h2, h5 ]
+        n = h5.next_sibling
+        while True:
+            if n.name == 'h5' or n.name == 'h2':
+                break
+            listing.append(n)
+            n = n.next_sibling
+
+        html = ' '.join(str(x) for x in listing)
+        soup = BeautifulSoup(html, 'lxml')
+        
+        return soup
 
     def scrape(self):
         resp = self.session.get(self.url)
@@ -106,12 +131,14 @@ class MDPublicLandsScraper(object):
         article = soup.find('article', id=re.compile(r'^post-\d+$'))
 
         for h5 in article.select('h5'):
-            if h5.text.find(':') != -1:
-                e = self.get_land_info(h5)
-                lands.append(e)                
-            else:
-                entries = self.process_sublist(h5)
+            listing = self.extract_listing(h5)
+
+            if listing.find('ul'):
+                entries = self.process_sublist(listing)
                 lands.extend(entries)
+            else:
+                e = self.get_land_info(listing)
+                lands.append(e)                
                 
         return lands
 
