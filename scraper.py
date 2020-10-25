@@ -10,8 +10,11 @@ import requests
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin
 
-RE_ACRES = re.compile(r'((\d+,)*(\d+))\s+acres')
-RE_ARCHERY_ONLY = re.compile(r'archery hunting only')
+FLAGS = (
+    ('Acres',             re.compile(r'((\d+,)*(\d+))\s+acres', re.I),    lambda m: m.group(1) ),
+    ('Archery Only',      re.compile(r'archery hunting only', re.I),      lambda m: True ),
+    ('Deer Archery Only', re.compile(r'deer archery hunting only', re.I), lambda m: True ),
+)
 
 class MDPublicLandsScraper(object):
     def __init__(self):
@@ -25,16 +28,27 @@ class MDPublicLandsScraper(object):
 
         self.session = requests.Session()
 
-    def csv_save(self, lands):
+    def csv_save(self, listings):
         headers = {
             'Name',
+            'Acres',
             'Archery Only',
+            'Deer Archery Only',
             'Free Permit Required',
             'Reservation Required',
             'MHP',
             'Daily Sign-in Required',
         }
 
+        filename = 'public_hunting_lands.csv'
+        
+        with open(filename, 'w') as fd:
+            csvwriter = csv.writer(fd,  delimiter=',')
+            csvwriter.writerow(headers)
+
+            for row in listings:
+                csvwriter.writerow(row)
+        
     def xlat_key_codes(self, keys):
         key_code = {
             'f': 'Free Permit Required',
@@ -47,7 +61,7 @@ class MDPublicLandsScraper(object):
         return d
 
     def get_land_info(self, listing):
-        global RE_ACRES, RE_ARCHERY_ONLY
+        global FLAGS
 
         h5 = listing.h5
         h2 = h5.find_previous('h2')
@@ -63,18 +77,16 @@ class MDPublicLandsScraper(object):
             
         x = {'class': 'Public-Land-Body'}
         p = h5.find_next('p', attrs=x)
+
+        for (k,r,f) in FLAGS:
+            m = re.search(r, p.text)
+            if m:
+                e[k] = f(m)
             
-        m = re.search(RE_ACRES, p.text)
-        if m:
-            e['acres'] = m.group(1)
-
-        m = re.search(RE_ARCHERY_ONLY, p.text)
-        if m:
-            e['archery_only'] = True
-
         return e
 
     def process_sublist(self, listing):
+        global FLAGS        
         entries = []
 
         h5 = listing.h5        
@@ -102,9 +114,10 @@ class MDPublicLandsScraper(object):
                 d = self.xlat_key_codes(keys)
                 e.update(d)
 
-            m = re.search(RE_ACRES, li.text)
-            if m:
-                e['acres'] = m.group(1)
+            for (k,r,f) in FLAGS:
+                m = re.search(r, li.text)
+                if m:
+                    e[k] = f(m)
                 
             entries.append(e)
 
@@ -148,5 +161,6 @@ class MDPublicLandsScraper(object):
 
 if __name__ == '__main__':
     scraper = MDPublicLandsScraper()
-    lands = scraper.scrape()
-    print(json.dumps(lands, indent=2))
+    listings = scraper.scrape()
+    print(json.dumps(listings, indent=2))
+    scraper.csv_save(listings)
