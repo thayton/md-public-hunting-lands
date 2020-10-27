@@ -29,8 +29,9 @@ class MDPublicLandsScraper(object):
         self.session = requests.Session()
 
     def csv_save(self, listings):
-        headers = {
+        headers = (
             'Name',
+            'County',
             'Acres',
             'Archery Only',
             'Deer Archery Only',
@@ -38,22 +39,22 @@ class MDPublicLandsScraper(object):
             'Reservation Required',
             'MHP',
             'Daily Sign-in Required',
-        }
+        )
 
         filename = 'public_hunting_lands.csv'
         
         with open(filename, 'w') as fd:
-            csvwriter = csv.writer(fd,  delimiter=',')
+            csvwriter = csv.writer(fd, quoting=csv.QUOTE_NONNUMERIC)
             csvwriter.writerow(headers)
-
-            for row in listings:
+            for l in listings:
+                row = [ l.get(k) for k in headers ]
                 csvwriter.writerow(row)
         
     def xlat_key_codes(self, keys):
         key_code = {
             'f': 'Free Permit Required',
             'r': 'Reservation Required',
-            'd': 'Daily Sign-In Required',
+            'd': 'Daily Sign-in Required',
             'm': 'MHP',
         }
 
@@ -72,8 +73,8 @@ class MDPublicLandsScraper(object):
 
         e = self.xlat_key_codes(keys)
 
-        e['name'] = name
-        e['county'] = h2.text.strip()
+        e['Name'] = name
+        e['County'] = h2.text.strip()
             
         x = {'class': 'Public-Land-Body'}
         p = h5.find_next('p', attrs=x)
@@ -107,8 +108,8 @@ class MDPublicLandsScraper(object):
                     keys = None
 
             e = {}
-            e['name'] = name
-            e['county'] = h2.text.strip()
+            e['Name'] = name
+            e['County'] = h2.text.strip()
 
             if keys:
                 d = self.xlat_key_codes(keys)
